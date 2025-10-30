@@ -1,0 +1,247 @@
+{
+  "test_run": {
+    "timestamp": "2025-10-28T14:12:57.779675+00:00",
+    "total_exchanges": 3,
+    "total_tests": 21,
+    "passed_tests": 19,
+    "failed_tests": 1,
+    "skipped_tests": 1,
+    "success_rate": 90.48
+  },
+  "exchanges": {
+    "binance": {
+      "name": "binance",
+      "capabilities": {
+        "ohlc": true,
+        "funding_rate": true,
+        "open_interest": true,
+        "liquidations": true,
+        "large_trades": true
+      },
+      "health_check": {
+        "status": "healthy",
+        "error": null
+      },
+      "rest_api": {
+        "get_ohlc": {
+          "status": "success",
+          "data_count": 5,
+          "sample_data": {
+            "exchange": "binance",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 10:00:00+00:00",
+            "interval": "1h",
+            "open": 114470.0,
+            "high": 114555.0,
+            "low": 114364.7,
+            "close": 114543.5,
+            "volume": 1788.845,
+            "quote_volume": 204744494.9731,
+            "trades_count": 56971,
+            "is_closed": true
+          }
+        },
+        "get_open_interest": {
+          "status": "success",
+          "data": {
+            "exchange": "binance",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 14:12:54.261000+00:00",
+            "open_interest": 78247.212,
+            "open_interest_value": null
+          }
+        },
+        "get_funding_rate": {
+          "status": "success",
+          "data": {
+            "exchange": "binance",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 08:00:00+00:00",
+            "funding_rate": 7.806e-05,
+            "funding_time": "2025-10-28 08:00:00+00:00",
+            "next_funding_rate": null,
+            "next_funding_time": null
+          }
+        }
+      },
+      "websocket": {
+        "stream_ohlc": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_large_trades": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_liquidations": {
+          "status": "error",
+          "error": "1 validation error for Liquidation\nvalue\n  Field required [type=missing, input_value={'exchange': 'binance', '...=datetime.timezone.utc)}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.12/v/missing"
+        }
+      },
+      "summary": {
+        "total_tests": 7,
+        "passed": 6,
+        "failed": 1,
+        "skipped": 0
+      }
+    },
+    "hyperliquid": {
+      "name": "hyperliquid",
+      "capabilities": {
+        "ohlc": true,
+        "funding_rate": true,
+        "open_interest": true,
+        "liquidations": false,
+        "large_trades": true
+      },
+      "health_check": {
+        "status": "healthy",
+        "error": null
+      },
+      "rest_api": {
+        "get_ohlc": {
+          "status": "success",
+          "data_count": 6,
+          "sample_data": {
+            "exchange": "hyperliquid",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 09:00:00+00:00",
+            "interval": "1h",
+            "open": 114404.0,
+            "high": 114620.0,
+            "low": 114175.0,
+            "close": 114515.0,
+            "volume": 647.91179,
+            "quote_volume": 74195618.63185,
+            "trades_count": 11924,
+            "is_closed": true
+          }
+        },
+        "get_open_interest": {
+          "status": "success",
+          "data": {
+            "exchange": "hyperliquid",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 14:13:13.571615+00:00",
+            "open_interest": 31691.26636,
+            "open_interest_value": 3663478699.9496403
+          }
+        },
+        "get_funding_rate": {
+          "status": "success",
+          "data": {
+            "exchange": "hyperliquid",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-08-20 10:00:00.059000+00:00",
+            "funding_rate": 1.25e-05,
+            "funding_time": "2025-08-20 10:00:00.059000+00:00",
+            "next_funding_rate": null,
+            "next_funding_time": null
+          }
+        }
+      },
+      "websocket": {
+        "stream_ohlc": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_large_trades": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_liquidations": {
+          "skipped": "Not supported"
+        }
+      },
+      "summary": {
+        "total_tests": 7,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 1
+      }
+    },
+    "bybit": {
+      "name": "bybit",
+      "capabilities": {
+        "ohlc": true,
+        "funding_rate": true,
+        "open_interest": true,
+        "liquidations": true,
+        "large_trades": true
+      },
+      "health_check": {
+        "status": "healthy",
+        "error": null
+      },
+      "rest_api": {
+        "get_ohlc": {
+          "status": "success",
+          "data_count": 5,
+          "sample_data": {
+            "exchange": "bybit",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 10:00:00+00:00",
+            "interval": "1h",
+            "open": 114467.2,
+            "high": 114565.0,
+            "low": 114353.6,
+            "close": 114549.0,
+            "volume": 1079.329,
+            "quote_volume": 123535406.9043,
+            "trades_count": 0,
+            "is_closed": true
+          }
+        },
+        "get_open_interest": {
+          "status": "success",
+          "data": {
+            "exchange": "bybit",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 14:00:00+00:00",
+            "open_interest": 53898.187,
+            "open_interest_value": null
+          }
+        },
+        "get_funding_rate": {
+          "status": "success",
+          "data": {
+            "exchange": "bybit",
+            "symbol": "BTCUSDT",
+            "timestamp": "2025-10-28 08:00:00+00:00",
+            "funding_rate": 3.558e-05,
+            "funding_time": "2025-10-28 08:00:00+00:00",
+            "next_funding_rate": null,
+            "next_funding_time": null
+          }
+        }
+      },
+      "websocket": {
+        "stream_ohlc": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_large_trades": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        },
+        "stream_liquidations": {
+          "status": "success",
+          "messages_received": 3,
+          "timeout_seconds": 10
+        }
+      },
+      "summary": {
+        "total_tests": 7,
+        "passed": 7,
+        "failed": 0,
+        "skipped": 0
+      }
+    }
+  }
+}

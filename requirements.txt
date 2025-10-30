@@ -1,0 +1,87 @@
+# ============================================
+# Core Web Framework
+# ============================================
+
+# FastAPI - Modern async web framework
+# Using version range for flexibility while avoiding breaking changes
+fastapi>=0.110,<1.0
+
+# Uvicorn - ASGI server for running FastAPI
+# [standard] includes recommended extras (uvloop, httptools, websockets)
+uvicorn[standard]>=0.27,<1.0
+
+# ============================================
+# HTTP & WebSocket Clients
+# ============================================
+
+# aiohttp - Async HTTP client for making requests to exchange APIs
+aiohttp>=3.9,<4.0
+
+# websockets - For WebSocket connections to exchange streams
+websockets>=12.0,<13.0
+
+# ============================================
+# Data Validation & Serialization
+# ============================================
+
+# Pydantic - Data validation using Python type annotations
+# V2 has significant improvements over V1, stay within V2 range
+pydantic>=2.6,<3.0
+
+# Pydantic settings management for loading .env files
+pydantic-settings>=2.1,<3.0
+
+# ============================================
+# Configuration Management
+# ============================================
+
+# python-dotenv - Load environment variables from .env file
+python-dotenv>=1.0,<2.0
+
+# ============================================
+# Date & Time Handling
+# ============================================
+
+# python-dateutil - Powerful extensions to datetime
+python-dateutil>=2.8,<3.0
+
+# ============================================
+# Testing
+# ============================================
+
+# pytest - Testing framework
+pytest>=8.0,<9.0
+
+# pytest-asyncio - Support for testing async code
+pytest-asyncio>=0.23,<1.0
+
+# pytest-cov - Code coverage reports
+pytest-cov>=4.1,<5.0
+
+# httpx - Async HTTP client for testing FastAPI endpoints
+httpx>=0.26,<1.0
+
+# ============================================
+# Code Quality (Optional but Recommended)
+# ============================================
+
+# black - Code formatter
+black>=24.1,<25.0
+
+# mypy - Static type checker
+mypy>=1.8,<2.0
+
+# ruff - Fast Python linter
+ruff>=0.2,<1.0
+
+# ============================================
+# Future Dependencies (Commented Out)
+# ============================================
+
+# Redis for distributed caching (uncomment when needed)
+# redis==5.0.1
+# aioredis==2.0.1
+
+# PostgreSQL/TimescaleDB for historical data (uncomment when needed)
+# asyncpg==0.29.0
+# sqlalchemy==2.0.25
