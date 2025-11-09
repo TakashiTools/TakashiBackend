@@ -23,6 +23,7 @@ Docs:
 
 from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import asyncio
@@ -142,6 +143,18 @@ app = FastAPI(
     lifespan=lifespan,
     docs_url="/docs",
     redoc_url="/redoc"
+)
+
+# CORS (allow your frontend origins)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "https://takash-psi.vercel.app"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
 )
 
 manager = ExchangeManager()  # Global exchange manager
