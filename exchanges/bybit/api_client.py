@@ -331,9 +331,7 @@ class BybitAPIClient:
                         symbol=symbol.upper(),
                         timestamp=to_utc_datetime(int(fr_data["fundingRateTimestamp"])),
                         funding_rate=float(fr_data["fundingRate"]),
-                        funding_time=to_utc_datetime(int(fr_data["fundingRateTimestamp"])),
-                        next_funding_rate=None,  # Not provided by Bybit
-                        next_funding_time=None   # Not provided by Bybit
+                        funding_time=to_utc_datetime(int(fr_data["fundingRateTimestamp"]))
                     )
                 )
 

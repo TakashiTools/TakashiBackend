@@ -25,11 +25,17 @@ from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnec
 from fastapi.responses import JSONResponse
 from typing import List, Optional
 from contextlib import asynccontextmanager
+import asyncio
 
 from core.exchange_manager import ExchangeManager
 from core.schemas import OHLC, OpenInterest, FundingRate
+from core.schemas import PredictedFunding
 from core.logging import logger
 from core.config import settings, validate_configuration
+from services.event_bus import bus
+from services.all_liquidations import get_all_liquidations_service
+from services.oi_vol_monitor import get_oi_vol_monitor
+from services.all_large_trades import get_all_large_trades_service
 
 
 # ============================================
@@ -44,6 +50,16 @@ async def lifespan(app: FastAPI):
     try:
         validate_configuration()
         await manager.initialize_all()
+        # Start background services
+        try:
+            # All-exchange liquidations aggregator
+            await get_all_liquidations_service(min_value_usd=50_000.0).start()
+            # Binance OI/Volume monitor
+            await get_oi_vol_monitor().start()
+            # All-exchange large trades aggregator
+            await get_all_large_trades_service().start()
+        except Exception as svc_err:
+            logger.error(f"Background services failed to start: {svc_err}")
         logger.info("=== Started Successfully ===")
     except Exception as e:
         logger.error(f"Startup failed: {e}")
@@ -54,6 +70,19 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("=== Shutting Down ===")
     try:
+        # Stop background services
+        try:
+            await get_all_liquidations_service().stop()
+        except Exception as svc_stop_err:
+            logger.error(f"Error stopping AllLiquidationsService: {svc_stop_err}")
+        try:
+            await get_oi_vol_monitor().stop()
+        except Exception as svc_stop_err:
+            logger.error(f"Error stopping OIVolMonitor: {svc_stop_err}")
+        try:
+            await get_all_large_trades_service().stop()
+        except Exception as svc_stop_err:
+            logger.error(f"Error stopping AllLargeTradesService: {svc_stop_err}")
         await manager.shutdown_all()
         logger.info("=== Shutdown Complete ===")
     except Exception as e:
@@ -65,29 +94,49 @@ async def lifespan(app: FastAPI):
 # ============================================
 
 app = FastAPI(
-    title="ITA Multi-Exchange Market Data API",
+    title="TAKASHI Multi-Exchange Market Data API",
     description=(
         "Unified REST and WebSocket API for cryptocurrency market data.\n\n"
         "**Supported Exchanges:** Binance Futures (USD-M), Hyperliquid\n\n"
         "## REST Endpoints\n"
         "- `GET /{exchange}/ohlc/{symbol}/{interval}` - Historical candlestick data\n"
         "- `GET /{exchange}/oi/{symbol}` - Current open interest\n"
-        "- `GET /{exchange}/oi-hist/{symbol}` - Historical open interest\n"
+        "- `GET /{exchange}/oi-hist/{symbol}` - Historical open interest (Binance only)\n"
         "- `GET /{exchange}/funding/{symbol}` - Current funding rate\n"
         "- `GET /{exchange}/funding-hist/{symbol}` - Historical funding rates\n"
+        "- `GET /hyperliquid/predicted-funding` - Predicted funding across venues (optional ?coin=BTC)\n"
+        "- `GET /multi/ohlc/{symbol}/{interval}` - OHLC from all exchanges\n"
         "- `GET /exchanges` - List supported exchanges\n"
         "- `GET /health` - Health check\n\n"
         "## WebSocket Streams\n"
-        "Pattern: `ws://localhost:8000/ws/{exchange}/{symbol}/{stream}`\n\n"
-        "**Available:**\n"
-        "- `ohlc?interval=1m` - Live candlesticks\n"
-        "- `large_trades` - Large trade events\n"
-        "- `liquidations` - Liquidation events (Binance only)\n\n"
-        "**Examples:**\n"
-        "```\n"
-        "ws://localhost:8000/ws/binance/BTCUSDT/ohlc?interval=1m\n"
-        "ws://localhost:8000/ws/hyperliquid/BTC/large_trades\n"
-        "```"
+        "\n"
+        "**A) Per‑exchange streams (symbol‑scoped)**\n"
+        "\n"
+        "Pattern: `ws://{host}/ws/{exchange}/{symbol}/{stream}`\n"
+        "- Streams:\n"
+        "  - `ohlc` (requires query `interval`, e.g., `?interval=1m|5m|1h`)\n"
+        "  - `large_trades`\n"
+        "  - `liquidations` (only on exchanges that support it)\n"
+        "- Examples:\n"
+        "  - `ws://localhost:8000/ws/binance/BTCUSDT/ohlc?interval=1m`\n"
+        "  - `ws://localhost:8000/ws/hyperliquid/BTC/large_trades`\n"
+        "\n"
+        "**B) Aggregated / derived streams (not symbol‑scoped)**\n"
+        "- Aggregated liquidations (multi‑exchange firehose):\n"
+        "  - `ws://{host}/ws/all/liquidations?min_value_usd=50000` (Binance, OKX, Bybit)\n"
+        "  - Query: `min_value_usd` filters events by USD value per connection\n"
+        "- OI / Volume spike alerts (Binance‑wide):\n"
+        "  - `ws://{host}/ws/oi-vol?timeframes=5m,15m,1h`\n"
+        "  - Query: `timeframes` selects which TFs the client receives (comma‑separated)\n"
+        "- Aggregated large trades (multi‑exchange, thresholded):\n"
+        "  - `ws://{host}/ws/all/large_trades?min_value_usd=100000`\n"
+        "- Examples:\n"
+        "  - `ws://localhost:8000/ws/all/liquidations?min_value_usd=50000`\n"
+        "  - `ws://localhost:8000/ws/oi-vol?timeframes=5m,15m`\n"
+        "  - `ws://localhost:8000/ws/all/large_trades?min_value_usd=100000`\n"
+        "\n"
+        "All WebSocket messages are JSON objects using our Pydantic schemas.\n"
+        "Clients should handle reconnects on disconnect."
     ),
     version="1.0.0",
     lifespan=lifespan,
@@ -106,7 +155,7 @@ manager = ExchangeManager()  # Global exchange manager
 async def root():
     """API information and available exchanges."""
     return {
-        "name": "ITA Multi-Exchange Market Data API",
+        "name": "TAKASHI Multi-Exchange Market Data API",
         "version": "1.0.0",
         "status": "operational",
         "docs": "/docs",
@@ -136,6 +185,122 @@ async def list_exchanges():
             for name in manager.list_exchanges()
         ]
     }
+
+@app.get("/ws-catalog", tags=["System"])
+async def ws_catalog():
+    """
+    List available WebSocket endpoints and patterns.
+
+    Note: WebSocket routes are not part of the OpenAPI/Swagger spec,
+    so they don't appear as operations under /docs. This endpoint
+    documents them for clients.
+    """
+    return {
+        "per_exchange_pattern": "ws://{host}/ws/{exchange}/{symbol}/{stream}",
+        "streams": {
+            "ohlc": "Live candlesticks (requires ?interval=1m|5m|...)",
+            "large_trades": "Large trade events",
+            "liquidations": "Liquidation events (exchange-dependent)"
+        },
+        "aggregated": [
+            {
+                "path": "/ws/all/liquidations",
+                "query": {"min_value_usd": "Minimum USD value filter (e.g., 50000)"},
+                "description": "Aggregated liquidations from Binance/OKX/Bybit"
+            },
+            {
+                "path": "/ws/all/large_trades",
+                "query": {"min_value_usd": "Minimum USD value filter (e.g., 100000)"},
+                "description": "Aggregated large trades from Binance/Bybit/Hyperliquid"
+            },
+            {
+                "path": "/ws/oi-vol",
+                "query": {"timeframes": "Comma-separated TFs (e.g., 5m,15m,1h)"},
+                "description": "Binance OI/Volume spike alerts"
+            }
+        ],
+        "examples": [
+            "ws://localhost:8000/ws/binance/BTCUSDT/ohlc?interval=1m",
+            "ws://localhost:8000/ws/hyperliquid/BTC/large_trades",
+            "ws://localhost:8000/ws/all/liquidations?min_value_usd=50000",
+            "ws://localhost:8000/ws/oi-vol?timeframes=5m,15m",
+            "ws://localhost:8000/ws/all/large_trades?min_value_usd=100000"
+        ]
+    }
+
+
+# ============================================
+# Aggregated Market Data Endpoints
+# NOTE: must be defined BEFORE generic '/{exchange}/...' routes
+#       to avoid being captured by the dynamic path.
+# ============================================
+
+def _to_hyperliquid_coin(symbol: str) -> str:
+    sym = symbol.upper()
+    for suffix in ["USDT", "USDC", "BUSD", "DAI", "TUSD", "USDP"]:
+        if sym.endswith(suffix):
+            return sym[: -len(suffix)]
+    return sym
+
+
+@app.get("/multi/ohlc/{symbol}/{interval}", tags=["Market Data"])
+async def get_multi_ohlc(
+    symbol: str,
+    interval: str,
+    limit: int = Query(default=200, ge=1, le=1000, description="Number of candles per exchange")
+):
+    """
+    Get historical OHLC for the same market across all exchanges concurrently.
+
+    Notes:
+        - Binance, Bybit expect pair symbols (e.g., BTCUSDT)
+        - Hyperliquid expects coin symbols (e.g., BTC) - mapped automatically
+        - Returns a dict: { exchangeName: List[OHLC] }
+    """
+    exchanges = ["binance", "bybit", "hyperliquid"]
+    tasks = {}
+
+    for name in exchanges:
+        if not manager.has_exchange(name):
+            continue
+        ex = manager.get_exchange(name)
+        if not ex.supports("ohlc"):
+            continue
+
+        sym = symbol
+        if name == "hyperliquid":
+            sym = _to_hyperliquid_coin(symbol)
+
+        tasks[name] = asyncio.create_task(ex.get_ohlc(sym, interval, limit))
+
+    results = {}
+    for name, task in tasks.items():
+        try:
+            results[name] = await task
+        except Exception as e:
+            logger.error(f"Multi OHLC error for {name}/{symbol}/{interval}: {e}")
+            results[name] = []
+
+    return results
+
+@app.get("/hyperliquid/predicted-funding", response_model=List[PredictedFunding], tags=["Market Data"])
+async def get_hl_predicted_funding(coin: Optional[str] = Query(default=None, description="Coin filter (e.g., BTC)")):
+    """
+    Predicted funding rates across venues (HlPerp, BinPerp, BybitPerp) from Hyperliquid.
+
+    Optional query param ?coin=BTC to filter a single coin.
+    """
+    try:
+        ex = manager.get_exchange("hyperliquid")
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    try:
+        data = await ex.get_predicted_funding(coin)
+        return data
+    except Exception as e:
+        logger.error(f"Predicted funding (Hyperliquid) error: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch predicted funding")
 
 
 # ============================================
@@ -205,7 +370,7 @@ async def get_open_interest_hist(
     """
     Get historical open interest data.
 
-    Note: Only supported by exchanges with historical OI endpoints (e.g., Binance).
+    Note: Only Binance supports historical open interest.
 
     Example:
         GET /binance/oi-hist/BTCUSDT?period=1h&limit=24
@@ -354,6 +519,118 @@ async def websocket_stream(
     finally:
         logger.info(f"WS ended: {exchange}/{symbol}/{stream}")
 
+
+# ============================================
+# New WebSocket Endpoints (Aggregated Services)
+# ============================================
+
+@app.websocket("/ws/all/liquidations")
+async def websocket_all_liquidations(
+    websocket: WebSocket,
+    min_value_usd: float = Query(default=5_000.0, description="Minimum USD value to forward to client")
+):
+    """
+    Aggregated liquidation stream across multiple exchanges (Binance, OKX, Hyperliquid).
+
+    Example:
+        ws://localhost:8000/ws/all/liquidations?min_value_usd=50000
+    """
+    await websocket.accept()
+    logger.info("WS connected: all/liquidations")
+    queue = await bus.subscribe("liquidation")
+    try:
+        while True:
+            try:
+                event = await queue.get()
+                # Per-connection filtering by USD value
+                if float(event.get("value", 0)) < float(min_value_usd):
+                    continue
+                await websocket.send_json(event)
+            except Exception as e:
+                logger.error(f"[WS all/liquidations] send error: {e}")
+                break
+    except WebSocketDisconnect:
+        logger.info("WS disconnected: all/liquidations")
+    except Exception as e:
+        logger.error(f"WS error all/liquidations: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except:
+            pass
+    finally:
+        await bus.unsubscribe("liquidation", queue)
+        logger.info("WS ended: all/liquidations")
+
+
+@app.websocket("/ws/oi-vol")
+async def websocket_oi_vol(
+    websocket: WebSocket,
+    timeframes: str = Query(default="5m,15m,1h", description="Comma-separated TFs to include (5m,15m,1h)")
+):
+    """
+    Binance OI/Volume spike alerts (z-score based).
+
+    Example:
+        ws://localhost:8000/ws/oi-vol?timeframes=5m,15m
+    """
+    await websocket.accept()
+    logger.info("WS connected: oi-vol")
+    allowed = {tf.strip() for tf in timeframes.split(",") if tf.strip()}
+    queue = await bus.subscribe("oi_spike")
+    try:
+        while True:
+            try:
+                event = await queue.get()
+                if event.get("timeframe") not in allowed:
+                    continue
+                await websocket.send_json(event)
+            except Exception as e:
+                logger.error(f"[WS oi-vol] send error: {e}")
+                break
+    except WebSocketDisconnect:
+        logger.info("WS disconnected: oi-vol")
+    except Exception as e:
+        logger.error(f"WS error oi-vol: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except:
+            pass
+    finally:
+        await bus.unsubscribe("oi_spike", queue)
+        logger.info("WS ended: oi-vol")
+
+@app.websocket("/ws/all/large_trades")
+async def websocket_all_large_trades(
+    websocket: WebSocket,
+    min_value_usd: float = Query(default=100_000.0, description="Minimum USD value to forward to client")
+):
+    """
+    Aggregated large trades across Binance, Bybit, Hyperliquid.
+    """
+    await websocket.accept()
+    logger.info("WS connected: all/large_trades")
+    queue = await bus.subscribe("large_trade")
+    try:
+        while True:
+            try:
+                event = await queue.get()
+                if float(event.get("value", 0)) < float(min_value_usd):
+                    continue
+                await websocket.send_json(event)
+            except Exception as e:
+                logger.error(f"[WS all/large_trades] send error: {e}")
+                break
+    except WebSocketDisconnect:
+        logger.info("WS disconnected: all/large_trades")
+    except Exception as e:
+        logger.error(f"WS error all/large_trades: {e}")
+        try:
+            await websocket.close(code=1011, reason="Internal error")
+        except:
+            pass
+    finally:
+        await bus.unsubscribe("large_trade", queue)
+        logger.info("WS ended: all/large_trades")
 
 # ============================================
 # Error Handlers

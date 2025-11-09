@@ -342,10 +342,19 @@ class BybitExchange(ExchangeInterface):
         """
         self.logger.info(f"[Bybit] Starting trade stream: {symbol}")
 
+        # Use the same global threshold as Binance for consistency
+        from core.config import settings
+        min_trade_value_usd = settings.large_trade_threshold_usd
+
         ws_client = BybitWSClient()
         async for trade in ws_client.stream_trades(symbol):
-            # Optionally filter by minimum trade value
-            # For now, yield all trades (caller can filter)
+            # Filter: only yield trades above threshold
+            try:
+                if float(trade.value) < float(min_trade_value_usd):
+                    continue
+            except Exception:
+                # If value not parsable, be conservative and skip
+                continue
             yield trade
 
     # ============================================

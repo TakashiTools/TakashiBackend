@@ -311,8 +311,6 @@ class FundingRate(BaseMarketModel):
     Additional Attributes:
         funding_rate: Current funding rate (as decimal, e.g., 0.0001 = 0.01%)
         funding_time: When the current funding is applied
-        next_funding_rate: Predicted next funding rate (if available)
-        next_funding_time: When the next funding will be applied
 
     Example:
         >>> fr = FundingRate(
@@ -321,8 +319,6 @@ class FundingRate(BaseMarketModel):
         ...     timestamp=datetime.utcnow(),
         ...     funding_rate=0.0001,  # 0.01%
         ...     funding_time=datetime(2024, 1, 1, 16, 0, 0),
-        ...     next_funding_rate=0.00015,
-        ...     next_funding_time=datetime(2024, 1, 2, 0, 0, 0)
         ... )
     """
 
@@ -336,25 +332,13 @@ class FundingRate(BaseMarketModel):
         description="Timestamp when current funding rate is applied"
     )
 
-    next_funding_rate: Optional[float] = Field(
-        None,
-        description="Predicted next funding rate (if available)"
-    )
-
-    next_funding_time: Optional[datetime] = Field(
-        None,
-        description="Timestamp when next funding will be applied"
-    )
-
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "exchange": "binance",
                 "symbol": "BTCUSDT",
                 "funding_rate": 0.0001,
-                "funding_time": "2024-01-01T16:00:00Z",
-                "next_funding_rate": 0.00015,
-                "next_funding_time": "2024-01-02T00:00:00Z"
+                "funding_time": "2024-01-01T16:00:00Z"
             }
         }
     )
@@ -534,6 +518,27 @@ class LargeTrade(BaseMarketModel):
             }
         }
     )
+
+
+# ============================================
+# Predicted Funding Schemas (Hyperliquid)
+# ============================================
+
+class PredictedVenueFunding(BaseModel):
+    """
+    Predicted funding for a specific venue (e.g., HlPerp, BinPerp, BybitPerp).
+    """
+    venue: str = Field(..., description="Venue identifier (e.g., HlPerp, BinPerp, BybitPerp)")
+    funding_rate: float = Field(..., description="Predicted funding rate as decimal")
+    next_funding_time: Optional[datetime] = Field(None, description="When the next funding will be applied")
+
+
+class PredictedFunding(BaseModel):
+    """
+    Predicted funding rates for a coin across multiple venues.
+    """
+    coin: str = Field(..., description="Coin symbol (e.g., BTC, ETH)")
+    venues: list[PredictedVenueFunding] = Field(default_factory=list, description="Predicted funding per venue")
 
 
 # ============================================

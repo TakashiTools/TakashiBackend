@@ -27,6 +27,7 @@ from typing import List, Dict, Optional, Any
 from core.logging import get_logger
 from core.utils.time import to_utc_datetime
 from core.schemas import OHLC, OpenInterest, FundingRate
+from core.schemas import PredictedFunding, PredictedVenueFunding
 
 
 class HyperliquidAPIClient:
@@ -298,15 +299,17 @@ class HyperliquidAPIClient:
         # Convert trading pair to coin symbol (BTCUSDT -> BTC)
         coin_symbol = self._extract_coin_symbol(symbol)
         
-        # Hyperliquid requires startTime parameter
-        # Use a reasonable default (90 days ago) to get recent history
+        # Hyperliquid requires a startTime. We also pass endTime=now to bound the window.
+        # Use a reasonable default (90 days) to include recent history.
         from core.utils.time import current_utc_timestamp
-        default_start_time = current_utc_timestamp(milliseconds=True) - (90 * 24 * 60 * 60 * 1000)
+        end_time = current_utc_timestamp(milliseconds=True)
+        default_start_time = end_time - (90 * 24 * 60 * 60 * 1000)
 
         payload = {
             "type": "fundingHistory",
             "coin": coin_symbol.upper(),
-            "startTime": default_start_time
+            "startTime": default_start_time,
+            "endTime": end_time
         }
 
         self.logger.info(f"Fetching funding rate history: {symbol} -> {coin_symbol} (limit={limit})")
@@ -318,7 +321,11 @@ class HyperliquidAPIClient:
                 self.logger.warning(f"No funding history for {symbol}")
                 return []
 
-            # Take the most recent 'limit' entries
+            # Sort by time ascending and take the most recent 'limit' entries
+            try:
+                data.sort(key=lambda x: x.get("time", 0))
+            except Exception:
+                pass
             funding_data = data[-limit:] if len(data) > limit else data
 
             # Normalize to FundingRate schema
@@ -328,9 +335,7 @@ class HyperliquidAPIClient:
                     symbol=symbol.upper(),
                     funding_rate=float(item["fundingRate"]),
                     funding_time=to_utc_datetime(item["time"]),
-                    timestamp=to_utc_datetime(item["time"]),
-                    next_funding_rate=None,  # Not provided by this endpoint
-                    next_funding_time=None   # Not provided by this endpoint
+                    timestamp=to_utc_datetime(item["time"])
                 )
                 for item in funding_data
             ]
@@ -344,27 +349,8 @@ class HyperliquidAPIClient:
 
     async def get_predicted_funding(self) -> Dict[str, float]:
         """
-        Fetch predicted next funding rates for all symbols.
-
-        Returns:
-            Dictionary mapping symbol to predicted funding rate (Hyperliquid only)
-
-        Hyperliquid Endpoint:
-            POST /info with {"type": "predictedFundings"}
-
-        Response Format:
-            [
-              ["BTC", [
-                ["BinPerp", {"fundingRate": "0.00015", ...}],
-                ["HlPerp", {"fundingRate": "0.0001", ...}],
-                ...
-              ]],
-              ...
-            ]
-
-        Example:
-            >>> predicted = await client.get_predicted_funding()
-            >>> print(f"BTC predicted: {predicted.get('BTC', 0) * 100:.4f}%")
+        Fetch predicted next funding rates for all symbols (HlPerp only summary).
+        Deprecated in favor of get_predicted_funding_full which includes venues.
         """
         payload = {"type": "predictedFundings"}
 
@@ -403,6 +389,44 @@ class HyperliquidAPIClient:
         except Exception as e:
             self.logger.error(f"Error fetching predicted funding: {e}")
             return {}
+
+    async def get_predicted_funding_full(self) -> List[PredictedFunding]:
+        """
+        Fetch predicted funding rates across venues for all coins.
+
+        Returns:
+            List[PredictedFunding] with venues including fundingRate and nextFundingTime.
+        """
+        payload = {"type": "predictedFundings"}
+        self.logger.info("Fetching predicted funding rates (full)")
+        try:
+            data = await self._post(payload)
+            if not data:
+                return []
+
+            results: List[PredictedFunding] = []
+            for entry in data:
+                if not isinstance(entry, list) or len(entry) < 2:
+                    continue
+                coin = str(entry[0]).upper()
+                venues_raw = entry[1]
+                venues: List[PredictedVenueFunding] = []
+                if isinstance(venues_raw, list):
+                    for v in venues_raw:
+                        if not isinstance(v, list) or len(v) < 2:
+                            continue
+                        venue_name = str(v[0])
+                        info = v[1] if isinstance(v[1], dict) else {}
+                        rate = float(info.get("fundingRate", 0))
+                        nft = info.get("nextFundingTime")
+                        nft_dt = to_utc_datetime(nft) if nft is not None else None
+                        venues.append(PredictedVenueFunding(venue=venue_name, funding_rate=rate, next_funding_time=nft_dt))
+                results.append(PredictedFunding(coin=coin, venues=venues))
+            self.logger.info(f"Fetched predicted funding (full) for {len(results)} coins")
+            return results
+        except Exception as e:
+            self.logger.error(f"Error fetching predicted funding (full): {e}")
+            return []
 
     async def get_historical_ohlc(
         self,

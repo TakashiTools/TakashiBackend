@@ -145,7 +145,7 @@ class Settings(BaseSettings):
     # ============================================
 
     large_trade_threshold_usd: int = Field(
-        default=100_000,
+        default=50_000,
         description="Minimum USD value for a trade to be considered 'large' ($100k default)"
     )
 

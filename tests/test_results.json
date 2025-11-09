@@ -59,8 +59,7 @@
             "timestamp": "2025-10-28 08:00:00+00:00",
             "funding_rate": 7.806e-05,
             "funding_time": "2025-10-28 08:00:00+00:00",
-            "next_funding_rate": null,
-            "next_funding_time": null
+            
           }
         }
       },
@@ -137,8 +136,7 @@
             "timestamp": "2025-08-20 10:00:00.059000+00:00",
             "funding_rate": 1.25e-05,
             "funding_time": "2025-08-20 10:00:00.059000+00:00",
-            "next_funding_rate": null,
-            "next_funding_time": null
+            
           }
         }
       },
@@ -214,8 +212,7 @@
             "timestamp": "2025-10-28 08:00:00+00:00",
             "funding_rate": 3.558e-05,
             "funding_time": "2025-10-28 08:00:00+00:00",
-            "next_funding_rate": null,
-            "next_funding_time": null
+            
           }
         }
       },

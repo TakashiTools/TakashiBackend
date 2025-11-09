@@ -48,7 +48,7 @@ Selected endpoints (see `/docs` for the full list):
 - System: `GET /`, `GET /health`, `GET /exchanges`
 - OHLC: `GET /{exchange}/ohlc/{symbol}/{interval}`
 - Open Interest (current): `GET /{exchange}/oi/{symbol}`
-- Open Interest (history): `GET /{exchange}/oi-hist/{symbol}` (if supported)
+- Open Interest (history): `GET /{exchange}/oi-hist/{symbol}` (Binance only)
 - Funding (current): `GET /{exchange}/funding/{symbol}`
 - Funding (history): `GET /{exchange}/funding-hist/{symbol}` (if supported)
 
@@ -57,6 +57,15 @@ WebSocket streams:
 - `ws://{host}/ws/{exchange}/{symbol}/ohlc?interval=1m`
 - `ws://{host}/ws/{exchange}/{symbol}/large_trades`
 - `ws://{host}/ws/{exchange}/{symbol}/liquidations` (if supported)
+- `ws://{host}/ws/all/liquidations?min_value_usd=50000` (aggregated across exchanges)
+- `ws://{host}/ws/oi-vol?timeframes=5m,15m,1h` (Binance OI/Volume spike alerts)
+
+Aggregated REST:
+
+- `GET /multi/ohlc/{symbol}/{interval}?limit=200` — fetch OHLC for the same market from all exchanges concurrently
+  - Example: `/multi/ohlc/BTCUSDT/5m?limit=200`
+  - Notes: Automatically maps Hyperliquid to coin symbol (BTC from BTCUSDT)
+- `GET /hyperliquid/predicted-funding?coin=BTC` — predicted funding across venues (HlPerp, BinPerp, BybitPerp)
 
 ## Configuration
 

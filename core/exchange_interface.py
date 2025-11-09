@@ -213,7 +213,6 @@ class ExchangeInterface(ABC):
         Example:
             >>> fr = await exchange.get_funding_rate("BTCUSDT")
             >>> print(f"Current rate: {fr.funding_rate * 100:.4f}%")
-            >>> print(f"Next funding: {fr.next_funding_time}")
 
         Notes:
             - Only applicable to perpetual (not dated) futures

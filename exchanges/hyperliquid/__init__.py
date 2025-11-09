@@ -38,6 +38,7 @@ Structure:
 from typing import List, AsyncGenerator, Optional
 from core.exchange_interface import ExchangeInterface
 from core.schemas import OHLC, OpenInterest, FundingRate, Liquidation, LargeTrade
+from core.schemas import PredictedFunding
 from core.logging import logger, get_logger
 from core.utils.time import to_utc_datetime, current_utc_timestamp
 from .api_client import HyperliquidAPIClient
@@ -223,7 +224,14 @@ class HyperliquidExchange(ExchangeInterface):
             interval_ms = self._interval_to_milliseconds(interval)
             start_time = end_time - (interval_ms * limit)
 
-        return await self.client.get_historical_ohlc(symbol, interval, start_time, end_time)
+        data = await self.client.get_historical_ohlc(symbol, interval, start_time, end_time)
+        # Some API ranges can be inclusive on both ends; enforce exact 'limit' candles.
+        try:
+            if isinstance(limit, int) and limit > 0 and isinstance(data, list) and len(data) > limit:
+                data = data[-limit:]
+        except Exception:
+            pass
+        return data
 
     async def get_open_interest(self, symbol: str) -> Optional[OpenInterest]:
         """
@@ -263,9 +271,16 @@ class HyperliquidExchange(ExchangeInterface):
             >>> if fr:
             ...     print(f"Funding rate: {fr.funding_rate * 100:.4f}%")
         """
-        # Get latest funding rate (limit=1 returns most recent)
-        funding_rates = await self.client.get_funding_rate(symbol, limit=1)
-        return funding_rates[0] if funding_rates else None
+        # Fetch recent history and return the entry with the latest funding_time
+        funding_rates = await self.client.get_funding_rate(symbol, limit=10)
+        if not funding_rates:
+            return None
+        try:
+            latest = max(funding_rates, key=lambda fr: fr.funding_time)
+            return latest
+        except Exception:
+            # Fallback to last element if comparison fails
+            return funding_rates[-1]
 
     # ============================================
     # WebSocket Streaming Methods
@@ -345,10 +360,18 @@ class HyperliquidExchange(ExchangeInterface):
         """
         self.logger.info(f"[Hyperliquid] Starting trade stream: {symbol}")
 
+        # Use the same global threshold as other exchanges
+        from core.config import settings
+        min_trade_value_usd = settings.large_trade_threshold_usd
+
         ws_client = HyperliquidWSClient()
         async for trade in ws_client.stream_trades(symbol):
-            # Optionally filter by minimum trade value
-            # For now, yield all trades (caller can filter)
+            # Filter: only yield trades above threshold
+            try:
+                if float(trade.value) < float(min_trade_value_usd):
+                    continue
+            except Exception:
+                continue
             yield trade
 
     # ============================================
@@ -383,3 +406,24 @@ class HyperliquidExchange(ExchangeInterface):
         else:
             self.logger.warning(f"Unknown interval unit: {unit}, defaulting to 1 minute")
             return 60 * 1000
+
+    # ============================================
+    # Predicted Funding (across venues)
+    # ============================================
+    async def get_predicted_funding(self, coin: Optional[str] = None) -> List[PredictedFunding]:
+        """
+        Get predicted funding rates across venues (HlPerp, BinPerp, BybitPerp) for all coins
+        or a single coin if provided.
+
+        Args:
+            coin: Optional coin symbol to filter (e.g., "BTC")
+
+        Returns:
+            List[PredictedFunding]
+        """
+        if not self.client:
+            return []
+        data = await self.client.get_predicted_funding_full()
+        if coin:
+            return [pf for pf in data if pf.coin.upper() == coin.upper()]
+        return data
