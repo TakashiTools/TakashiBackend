@@ -27,6 +27,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List, Optional
 from contextlib import asynccontextmanager
 import asyncio
+import httpx
 
 from core.exchange_manager import ExchangeManager
 from core.schemas import OHLC, OpenInterest, FundingRate
@@ -108,7 +109,9 @@ app = FastAPI(
         "- `GET /hyperliquid/predicted-funding` - Predicted funding across venues (optional ?coin=BTC)\n"
         "- `GET /multi/ohlc/{symbol}/{interval}` - OHLC from all exchanges\n"
         "- `GET /exchanges` - List supported exchanges\n"
-        "- `GET /health` - Health check\n\n"
+        "- `GET /health` - Health check\n"
+        "- `GET /coinmarketcap/categories` - CoinMarketCap categories proxy\n"
+        "- `GET /coinmarketcap/category` - CoinMarketCap category details proxy\n\n"
         "## WebSocket Streams\n"
         "\n"
         "**A) Per‑exchange streams (symbol‑scoped)**\n"
@@ -456,6 +459,104 @@ async def get_funding_rate_hist(
     except Exception as e:
         logger.error(f"Funding history error {exchange}/{symbol}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch funding history: {str(e)}")
+
+
+# ============================================
+# CoinMarketCap Proxy Endpoints
+# ============================================
+
+CMC_BASE_URL = "https://pro-api.coinmarketcap.com/v1/cryptocurrency"
+
+
+@app.get("/coinmarketcap/categories", tags=["External APIs"])
+async def get_cmc_categories(
+    start: int = Query(1, ge=1, description="Offset start (1-based index)"),
+    limit: int = Query(100, ge=1, le=5000, description="Number of results to return")
+):
+    """
+    Proxy endpoint for CoinMarketCap Categories API.
+    
+    Returns information about all coin categories available on CoinMarketCap.
+    This endpoint bypasses CORS restrictions and securely handles the API key.
+    
+    Example:
+        GET /coinmarketcap/categories?start=1&limit=100
+    """
+    if not settings.coinmarketcap_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="CoinMarketCap API key not configured"
+        )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{CMC_BASE_URL}/categories",
+                params={"start": start, "limit": limit},
+                headers={"X-CMC_PRO_API_KEY": settings.coinmarketcap_api_key},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        # Forward CoinMarketCap API errors
+        error_detail = e.response.json() if e.response.headers.get("content-type") == "application/json" else e.response.text
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=error_detail
+        )
+    except httpx.RequestError as e:
+        logger.error(f"CoinMarketCap API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to connect to CoinMarketCap API: {str(e)}"
+        )
+
+
+@app.get("/coinmarketcap/category", tags=["External APIs"])
+async def get_cmc_category(
+    id: str = Query(..., description="Category ID (required)"),
+    start: int = Query(1, ge=1, description="Offset start (1-based index)"),
+    limit: int = Query(100, ge=1, le=1000, description="Number of coins to return")
+):
+    """
+    Proxy endpoint for CoinMarketCap Category API.
+    
+    Returns detailed information about a single coin category including tokens.
+    This endpoint bypasses CORS restrictions and securely handles the API key.
+    
+    Example:
+        GET /coinmarketcap/category?id=605e2ce9d41eae1066535f7c&limit=100
+    """
+    if not settings.coinmarketcap_api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="CoinMarketCap API key not configured"
+        )
+    
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{CMC_BASE_URL}/category",
+                params={"id": id, "start": start, "limit": limit},
+                headers={"X-CMC_PRO_API_KEY": settings.coinmarketcap_api_key},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        # Forward CoinMarketCap API errors
+        error_detail = e.response.json() if e.response.headers.get("content-type") == "application/json" else e.response.text
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=error_detail
+        )
+    except httpx.RequestError as e:
+        logger.error(f"CoinMarketCap API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to connect to CoinMarketCap API: {str(e)}"
+        )
 
 
 # ============================================

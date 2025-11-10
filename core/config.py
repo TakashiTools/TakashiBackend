@@ -150,6 +150,15 @@ class Settings(BaseSettings):
     )
 
     # ============================================
+    # CoinMarketCap API Configuration
+    # ============================================
+
+    coinmarketcap_api_key: str = Field(
+        default="",
+        description="CoinMarketCap API key (optional, for categories widget)"
+    )
+
+    # ============================================
     # Caching Configuration
     # ============================================
 
