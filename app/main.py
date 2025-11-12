@@ -111,7 +111,10 @@ app = FastAPI(
         "- `GET /exchanges` - List supported exchanges\n"
         "- `GET /health` - Health check\n"
         "- `GET /coinmarketcap/categories` - CoinMarketCap categories proxy\n"
-        "- `GET /coinmarketcap/category` - CoinMarketCap category details proxy\n\n"
+        "- `GET /coinmarketcap/category` - CoinMarketCap category details proxy\n"
+        "- `GET /binance/tickers/24hr` - Binance 24h ticker data (all symbols)\n"
+        "- `GET /binance/mark-prices` - Binance mark price/funding data (all symbols)\n"
+        "- `GET /binance/klines/{symbol}/{interval}` - Binance klines (raw format)\n\n"
         "## WebSocket Streams\n"
         "\n"
         "**A) Per‑exchange streams (symbol‑scoped)**\n"
@@ -459,6 +462,131 @@ async def get_funding_rate_hist(
     except Exception as e:
         logger.error(f"Funding history error {exchange}/{symbol}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch funding history: {str(e)}")
+
+
+# ============================================
+# Binance Proxy Endpoints (Raw Format)
+# ============================================
+
+BINANCE_API_BASE = "https://fapi.binance.com/fapi/v1"
+
+
+@app.get("/binance/tickers/24hr", tags=["Binance Proxy"])
+async def get_binance_tickers_24hr():
+    """
+    Proxy endpoint for Binance 24h ticker data (all symbols).
+    
+    Returns raw Binance ticker format for frontend compatibility.
+    This endpoint bypasses CORS restrictions and provides centralized rate limiting.
+    
+    Example:
+        GET /binance/tickers/24hr
+    
+    Returns: Array of ticker objects in Binance format
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BINANCE_API_BASE}/ticker/24hr",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()  # Return raw Binance format
+    except httpx.HTTPStatusError as e:
+        # Forward Binance API errors
+        error_detail = e.response.json() if e.response.headers.get("content-type") == "application/json" else e.response.text
+        logger.error(f"Binance tickers API error: {e.response.status_code} - {error_detail}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=error_detail
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Binance API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to connect to Binance API: {str(e)}"
+        )
+
+
+@app.get("/binance/mark-prices", tags=["Binance Proxy"])
+async def get_binance_mark_prices():
+    """
+    Proxy endpoint for Binance mark price and funding rate data (all symbols).
+    
+    Returns raw Binance mark price format for frontend compatibility.
+    This endpoint returns mark price info for all symbols (no symbol parameter = all).
+    
+    Example:
+        GET /binance/mark-prices
+    
+    Returns: Array of mark price objects in Binance format
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BINANCE_API_BASE}/premiumIndex",
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()  # Return raw Binance format
+    except httpx.HTTPStatusError as e:
+        # Forward Binance API errors
+        error_detail = e.response.json() if e.response.headers.get("content-type") == "application/json" else e.response.text
+        logger.error(f"Binance mark prices API error: {e.response.status_code} - {error_detail}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=error_detail
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Binance API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to connect to Binance API: {str(e)}"
+        )
+
+
+@app.get("/binance/klines/{symbol}/{interval}", tags=["Binance Proxy"])
+async def get_binance_klines_raw(
+    symbol: str,
+    interval: str,
+    limit: int = Query(500, ge=1, le=1500, description="Number of klines to return")
+):
+    """
+    Proxy endpoint for Binance klines (raw format).
+    
+    Returns raw Binance klines array format for frontend compatibility.
+    This is a proxy endpoint that returns the exact Binance format.
+    
+    Note: For normalized OHLC data, use /binance/ohlc/{symbol}/{interval} instead.
+    
+    Example:
+        GET /binance/klines/BTCUSDT/5m?limit=12
+    
+    Returns: Array of kline arrays in Binance format [[openTime, open, high, low, close, volume, ...], ...]
+    """
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{BINANCE_API_BASE}/klines",
+                params={"symbol": symbol.upper(), "interval": interval, "limit": limit},
+                timeout=10.0
+            )
+            response.raise_for_status()
+            return response.json()  # Return raw Binance format
+    except httpx.HTTPStatusError as e:
+        # Forward Binance API errors
+        error_detail = e.response.json() if e.response.headers.get("content-type") == "application/json" else e.response.text
+        logger.error(f"Binance klines API error: {e.response.status_code} - {error_detail}")
+        raise HTTPException(
+            status_code=e.response.status_code,
+            detail=error_detail
+        )
+    except httpx.RequestError as e:
+        logger.error(f"Binance API connection error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail=f"Failed to connect to Binance API: {str(e)}"
+        )
 
 
 # ============================================
