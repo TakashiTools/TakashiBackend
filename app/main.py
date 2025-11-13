@@ -341,13 +341,17 @@ async def get_ohlc(
     exchange: str,
     symbol: str,
     interval: str,
-    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles")
+    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles"),
+    startTime: Optional[int] = Query(default=None, description="Start time in milliseconds (Unix timestamp)"),
+    endTime: Optional[int] = Query(default=None, description="End time in milliseconds (Unix timestamp)")
 ):
     """
     Get historical OHLC/candlestick data.
 
     Examples:
         GET /binance/ohlc/BTCUSDT/1h?limit=100
+        GET /binance/ohlc/BTCUSDT/1m?limit=120&endTime=1699876800000
+        GET /binance/ohlc/BTCUSDT/1h?limit=50&startTime=1699876800000&endTime=1699880400000
         GET /hyperliquid/ohlc/BTC/1m?limit=50
     """
     try:
@@ -359,7 +363,7 @@ async def get_ohlc(
         raise HTTPException(status_code=404, detail=f"{exchange} does not support OHLC")
 
     try:
-        return await ex.get_ohlc(symbol, interval, limit)
+        return await ex.get_ohlc(symbol, interval, limit, startTime, endTime)
     except Exception as e:
         logger.error(f"OHLC error {exchange}/{symbol}/{interval}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch OHLC: {str(e)}")

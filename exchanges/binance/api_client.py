@@ -187,7 +187,9 @@ class BinanceAPIClient:
         self,
         symbol: str,
         interval: str,
-        limit: int = 500
+        limit: int = 500,
+        startTime: Optional[int] = None,
+        endTime: Optional[int] = None
     ) -> List[OHLC]:
         """
         Fetch historical OHLC (candlestick) data.
@@ -196,6 +198,8 @@ class BinanceAPIClient:
             symbol: Trading pair (e.g., "BTCUSDT")
             interval: Candlestick interval (e.g., "1m", "5m", "1h", "1d")
             limit: Number of candles to fetch (max 1500, default 500)
+            startTime: Optional start time in milliseconds (Unix timestamp)
+            endTime: Optional end time in milliseconds (Unix timestamp)
 
         Returns:
             List of OHLC objects sorted by timestamp (oldest first)
@@ -225,14 +229,29 @@ class BinanceAPIClient:
         Example:
             >>> ohlc = await client.get_ohlc("BTCUSDT", "1h", limit=100)
             >>> print(f"Latest close: ${ohlc[-1].close:,.2f}")
+            
+            >>> # Fetch historical data before a specific time
+            >>> ohlc = await client.get_ohlc("BTCUSDT", "1m", limit=120, endTime=1699876800000)
         """
         params = {
             "symbol": symbol.upper(),
             "interval": interval,
             "limit": min(limit, 1500)  # Binance max is 1500
         }
+        
+        # Add optional time parameters
+        if startTime is not None:
+            params["startTime"] = startTime
+        if endTime is not None:
+            params["endTime"] = endTime
 
-        self.logger.info(f"Fetching OHLC: {symbol} {interval} (limit={limit})")
+        log_msg = f"Fetching OHLC: {symbol} {interval} (limit={limit}"
+        if startTime:
+            log_msg += f", startTime={startTime}"
+        if endTime:
+            log_msg += f", endTime={endTime}"
+        log_msg += ")"
+        self.logger.info(log_msg)
 
         data = await self._get("/fapi/v1/klines", params)
 
