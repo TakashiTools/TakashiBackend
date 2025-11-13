@@ -149,11 +149,6 @@ class Settings(BaseSettings):
         description="Minimum USD value for a trade to be considered 'large' ($100k default)"
     )
 
-    max_symbols_per_connection: int = Field(
-        default=100,
-        description="Maximum symbols per multi-symbol WebSocket connection"
-    )
-
     # ============================================
     # CoinMarketCap API Configuration
     # ============================================

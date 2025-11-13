@@ -36,7 +36,7 @@ Future Structure:
     └── ws_client.py         # WebSocket streaming client
 """
 
-from typing import List, AsyncGenerator, Optional
+from typing import List, AsyncGenerator
 from core.exchange_interface import ExchangeInterface
 from core.schemas import OHLC, OpenInterest, FundingRate, Liquidation, LargeTrade
 from core.logging import logger
@@ -196,9 +196,7 @@ class BinanceExchange(ExchangeInterface):
         self,
         symbol: str,
         interval: str,
-        limit: int = 500,
-        startTime: Optional[int] = None,
-        endTime: Optional[int] = None
+        limit: int = 500
     ) -> List[OHLC]:
         """
         Fetch historical OHLC data from Binance.
@@ -207,23 +205,18 @@ class BinanceExchange(ExchangeInterface):
             symbol: Trading pair (e.g., "BTCUSDT")
             interval: Candlestick interval (e.g., "1m", "5m", "1h", "1d")
             limit: Number of candles to fetch (max 1500)
-            startTime: Optional start time in milliseconds (Unix timestamp)
-            endTime: Optional end time in milliseconds (Unix timestamp)
 
         Returns:
             List[OHLC]: List of candlestick data
 
         Binance Endpoint:
-            GET /fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}&startTime={startTime}&endTime={endTime}
+            GET /fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}
 
         Example:
             >>> ohlc = await exchange.get_ohlc("BTCUSDT", "1h", limit=100)
             >>> print(f"Latest close: ${ohlc[-1].close:,.2f}")
-            
-            >>> # Fetch historical data before a specific time
-            >>> ohlc = await exchange.get_ohlc("BTCUSDT", "1m", limit=120, endTime=1699876800000)
         """
-        return await self.client.get_ohlc(symbol, interval, limit, startTime, endTime)
+        return await self.client.get_ohlc(symbol, interval, limit)
 
     async def get_open_interest(self, symbol: str) -> OpenInterest:
         """

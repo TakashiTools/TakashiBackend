@@ -34,8 +34,6 @@ from core.schemas import OHLC, OpenInterest, FundingRate
 from core.schemas import PredictedFunding
 from core.logging import logger
 from core.config import settings, validate_configuration
-from core.utils.time import to_utc_datetime
-from exchanges.binance.ws_client import create_kline_stream
 from services.event_bus import bus
 from services.all_liquidations import get_all_liquidations_service
 from services.oi_vol_monitor import get_oi_vol_monitor
@@ -239,12 +237,6 @@ async def ws_catalog():
                 "path": "/ws/oi-vol",
                 "query": {"timeframes": "Comma-separated TFs (e.g., 5m,15m,1h)"},
                 "description": "Binance OI/Volume spike alerts"
-            },
-            {
-                "path": "/ws/binance/multi/ohlc",
-                "query": {"interval": "Candle interval (1m, 5m, 15m, 1h, etc.)"},
-                "description": "Multi-symbol OHLC stream (subscribe via JSON messages: {action: 'subscribe', symbols: [...]})",
-                "note": "Allows subscribing to multiple symbols over single connection to reduce browser connection limits"
             }
         ],
         "examples": [
@@ -252,8 +244,7 @@ async def ws_catalog():
             "ws://localhost:8000/ws/hyperliquid/BTC/large_trades",
             "ws://localhost:8000/ws/all/liquidations?min_value_usd=50000",
             "ws://localhost:8000/ws/oi-vol?timeframes=5m,15m",
-            "ws://localhost:8000/ws/all/large_trades?min_value_usd=100000",
-            "ws://localhost:8000/ws/binance/multi/ohlc?interval=15m"
+            "ws://localhost:8000/ws/all/large_trades?min_value_usd=100000"
         ]
     }
 
@@ -341,17 +332,13 @@ async def get_ohlc(
     exchange: str,
     symbol: str,
     interval: str,
-    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles"),
-    startTime: Optional[int] = Query(default=None, description="Start time in milliseconds (Unix timestamp)"),
-    endTime: Optional[int] = Query(default=None, description="End time in milliseconds (Unix timestamp)")
+    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles")
 ):
     """
     Get historical OHLC/candlestick data.
 
     Examples:
         GET /binance/ohlc/BTCUSDT/1h?limit=100
-        GET /binance/ohlc/BTCUSDT/1m?limit=120&endTime=1699876800000
-        GET /binance/ohlc/BTCUSDT/1h?limit=50&startTime=1699876800000&endTime=1699880400000
         GET /hyperliquid/ohlc/BTC/1m?limit=50
     """
     try:
@@ -363,7 +350,7 @@ async def get_ohlc(
         raise HTTPException(status_code=404, detail=f"{exchange} does not support OHLC")
 
     try:
-        return await ex.get_ohlc(symbol, interval, limit, startTime, endTime)
+        return await ex.get_ohlc(symbol, interval, limit)
     except Exception as e:
         logger.error(f"OHLC error {exchange}/{symbol}/{interval}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch OHLC: {str(e)}")
@@ -887,245 +874,6 @@ async def websocket_all_large_trades(
     finally:
         await bus.unsubscribe("large_trade", queue)
         logger.info("WS ended: all/large_trades")
-
-
-# ============================================
-# Multi-Symbol OHLC WebSocket Endpoint
-# ============================================
-
-@app.websocket("/ws/binance/multi/ohlc")
-async def websocket_multi_symbol_ohlc(
-    websocket: WebSocket,
-    interval: str = Query(..., description="Candle interval (1m, 5m, 15m, 1h, etc.)")
-):
-    """
-    Aggregate OHLC stream for multiple symbols over single WebSocket connection.
-    
-    This endpoint allows subscribing to multiple symbols and receiving OHLC updates
-    for all of them over a single WebSocket connection, reducing browser connection limits.
-    
-    Connection Flow:
-    1. Client connects: ws://host/ws/binance/multi/ohlc?interval=15m
-    2. Client sends subscription: {"action": "subscribe", "symbols": ["BTCUSDT", "ETHUSDT", ...]}
-    3. Server streams OHLC updates for all subscribed symbols
-    
-    Client can dynamically add/remove symbols:
-    - {"action": "subscribe", "symbols": ["ADAUSDT"]}
-    - {"action": "unsubscribe", "symbols": ["BTCUSDT"]}
-    
-    Example:
-        ws://localhost:8000/ws/binance/multi/ohlc?interval=15m
-    """
-    await websocket.accept()
-    logger.info(f"WS connected: binance/multi/ohlc (interval={interval})")
-    
-    subscribed_symbols: set[str] = set()
-    binance_connections: dict[str, asyncio.Task] = {}  # symbol -> task
-    _is_running = True
-    
-    async def send_error(message: str, code: str, symbol: Optional[str] = None):
-        """Send error message to client."""
-        error_msg = {"type": "error", "message": message, "code": code}
-        if symbol:
-            error_msg["symbol"] = symbol
-        try:
-            await websocket.send_json(error_msg)
-        except Exception as e:
-            logger.error(f"Failed to send error message: {e}")
-    
-    async def forward_symbol_updates(symbol: str, interval: str):
-        """Forward OHLC updates from Binance for a single symbol."""
-        try:
-            async with create_kline_stream(symbol, interval) as ws_client:
-                async for msg in ws_client.listen():
-                    if not _is_running:
-                        break
-                    
-                    # Validate message type
-                    if msg.get("e") != "kline":
-                        continue
-                    
-                    # Extract kline data
-                    k = msg.get("k", {})
-                    
-                    # Normalize to OHLC schema
-                    ohlc = OHLC(
-                        exchange="binance",
-                        symbol=symbol.upper(),
-                        interval=interval,
-                        timestamp=to_utc_datetime(k.get("t")),
-                        open=float(k.get("o", 0)),
-                        high=float(k.get("h", 0)),
-                        low=float(k.get("l", 0)),
-                        close=float(k.get("c", 0)),
-                        volume=float(k.get("v", 0)),
-                        quote_volume=float(k.get("q", 0)),
-                        trades_count=int(k.get("n", 0)),
-                        is_closed=bool(k.get("x", False))
-                    )
-                    
-                    # Forward to client
-                    try:
-                        await websocket.send_json(ohlc.model_dump(mode="json"))
-                    except Exception as e:
-                        logger.error(f"Failed to send OHLC update for {symbol}: {e}")
-                        break
-                        
-        except asyncio.CancelledError:
-            logger.info(f"Symbol forwarder cancelled: {symbol}")
-        except Exception as e:
-            logger.error(f"Error forwarding updates for {symbol}: {e}")
-            if _is_running:
-                await send_error(f"Failed to subscribe to {symbol}", "SUBSCRIPTION_FAILED", symbol)
-        finally:
-            # Clean up connection
-            if symbol in binance_connections:
-                del binance_connections[symbol]
-            subscribed_symbols.discard(symbol)
-    
-    async def handle_client_messages():
-        """Handle incoming messages from client (subscribe/unsubscribe)."""
-        try:
-            while _is_running:
-                try:
-                    # Wait for message with timeout
-                    data = await asyncio.wait_for(websocket.receive_json(), timeout=300.0)
-                    
-                    action = data.get("action")
-                    symbols = data.get("symbols", [])
-                    
-                    if action == "subscribe":
-                        # Validate symbol count
-                        new_count = len(subscribed_symbols) + len(symbols)
-                        if new_count > settings.max_symbols_per_connection:
-                            await send_error(
-                                f"Too many symbols requested (max {settings.max_symbols_per_connection})",
-                                "RATE_LIMIT"
-                            )
-                            continue
-                        
-                        # Subscribe to each symbol
-                        for symbol in symbols:
-                            symbol_upper = symbol.upper()
-                            
-                            # Validate symbol format (basic check)
-                            if not symbol_upper.endswith("USDT"):
-                                await send_error(f"Invalid symbol format: {symbol}", "INVALID_SYMBOL", symbol)
-                                continue
-                            
-                            # Skip if already subscribed
-                            if symbol_upper in subscribed_symbols:
-                                continue
-                            
-                            # Start forwarding task for this symbol
-                            task = asyncio.create_task(
-                                forward_symbol_updates(symbol_upper, interval),
-                                name=f"ohlc_{symbol_upper}"
-                            )
-                            binance_connections[symbol_upper] = task
-                            subscribed_symbols.add(symbol_upper)
-                            logger.info(f"Subscribed to {symbol_upper} (total: {len(subscribed_symbols)})")
-                    
-                    elif action == "unsubscribe":
-                        # Unsubscribe from symbols
-                        for symbol in symbols:
-                            symbol_upper = symbol.upper()
-                            
-                            if symbol_upper in subscribed_symbols:
-                                # Cancel the forwarding task
-                                if symbol_upper in binance_connections:
-                                    task = binance_connections[symbol_upper]
-                                    task.cancel()
-                                    try:
-                                        await task
-                                    except asyncio.CancelledError:
-                                        pass
-                                
-                                subscribed_symbols.discard(symbol_upper)
-                                logger.info(f"Unsubscribed from {symbol_upper} (remaining: {len(subscribed_symbols)})")
-                    
-                    else:
-                        await send_error(f"Invalid action: {action}", "INVALID_ACTION")
-                
-                except asyncio.TimeoutError:
-                    # No message received for 5 minutes - close connection
-                    logger.info("No activity for 5 minutes, closing connection")
-                    break
-                except WebSocketDisconnect:
-                    break
-                except Exception as e:
-                    logger.error(f"Error handling client message: {e}")
-                    await send_error("Internal server error", "INTERNAL_ERROR")
-                    break
-        
-        except WebSocketDisconnect:
-            logger.info("Client disconnected from multi-symbol OHLC")
-        finally:
-            _is_running = False
-    
-    try:
-        # Wait for initial subscription (with timeout)
-        try:
-            initial_data = await asyncio.wait_for(websocket.receive_json(), timeout=60.0)
-            
-            if initial_data.get("action") == "subscribe":
-                symbols = initial_data.get("symbols", [])
-                
-                # Validate symbol count
-                if len(symbols) > settings.max_symbols_per_connection:
-                    await send_error(
-                        f"Too many symbols requested (max {settings.max_symbols_per_connection})",
-                        "RATE_LIMIT"
-                    )
-                    await websocket.close(code=1008, reason="Too many symbols")
-                    return
-                
-                # Subscribe to all symbols
-                for symbol in symbols:
-                    symbol_upper = symbol.upper()
-                    
-                    # Validate symbol format
-                    if not symbol_upper.endswith("USDT"):
-                        await send_error(f"Invalid symbol format: {symbol}", "INVALID_SYMBOL", symbol)
-                        continue
-                    
-                    # Start forwarding task
-                    task = asyncio.create_task(
-                        forward_symbol_updates(symbol_upper, interval),
-                        name=f"ohlc_{symbol_upper}"
-                    )
-                    binance_connections[symbol_upper] = task
-                    subscribed_symbols.add(symbol_upper)
-                    logger.info(f"Initial subscription: {symbol_upper} (total: {len(subscribed_symbols)})")
-            else:
-                await send_error("First message must be a subscribe action", "INVALID_ACTION")
-                await websocket.close(code=1008, reason="Invalid initial message")
-                return
-        
-        except asyncio.TimeoutError:
-            await send_error("No subscription received within 60 seconds", "TIMEOUT")
-            await websocket.close(code=1008, reason="No subscription")
-            return
-        
-        # Start message handler for subsequent subscribe/unsubscribe messages
-        await handle_client_messages()
-        
-    except WebSocketDisconnect:
-        logger.info("WS disconnected: binance/multi/ohlc")
-    except Exception as e:
-        logger.error(f"WS error binance/multi/ohlc: {e}")
-    finally:
-        # Cleanup: cancel all symbol forwarding tasks
-        _is_running = False
-        for symbol, task in binance_connections.items():
-            task.cancel()
-            try:
-                await task
-            except asyncio.CancelledError:
-                pass
-        
-        logger.info(f"WS ended: binance/multi/ohlc (subscribed to {len(subscribed_symbols)} symbols)")
-
 
 # ============================================
 # Error Handlers
