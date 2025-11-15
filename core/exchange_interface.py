@@ -49,7 +49,7 @@ Capabilities System:
 """
 
 from abc import ABC, abstractmethod
-from typing import List, AsyncGenerator, Dict
+from typing import List, AsyncGenerator, Dict, Optional
 from core.schemas import OHLC, OpenInterest, FundingRate, Liquidation, LargeTrade
 
 
