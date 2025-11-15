@@ -36,7 +36,7 @@ Future Structure:
     └── ws_client.py         # WebSocket streaming client
 """
 
-from typing import List, AsyncGenerator
+from typing import List, AsyncGenerator, Optional
 from core.exchange_interface import ExchangeInterface
 from core.schemas import OHLC, OpenInterest, FundingRate, Liquidation, LargeTrade
 from core.logging import logger
@@ -196,7 +196,9 @@ class BinanceExchange(ExchangeInterface):
         self,
         symbol: str,
         interval: str,
-        limit: int = 500
+        limit: int = 500,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
     ) -> List[OHLC]:
         """
         Fetch historical OHLC data from Binance.
@@ -205,18 +207,25 @@ class BinanceExchange(ExchangeInterface):
             symbol: Trading pair (e.g., "BTCUSDT")
             interval: Candlestick interval (e.g., "1m", "5m", "1h", "1d")
             limit: Number of candles to fetch (max 1500)
+            start_time: Optional start time in milliseconds since epoch
+            end_time: Optional end time in milliseconds since epoch
 
         Returns:
             List[OHLC]: List of candlestick data
 
         Binance Endpoint:
-            GET /fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}
+            GET /fapi/v1/klines?symbol={symbol}&interval={interval}&limit={limit}&startTime={startTime}&endTime={endTime}
 
         Example:
             >>> ohlc = await exchange.get_ohlc("BTCUSDT", "1h", limit=100)
             >>> print(f"Latest close: ${ohlc[-1].close:,.2f}")
+            
+            >>> # Fetch candles for a specific time range
+            >>> start = 1704110400000  # Jan 1, 2024 12:00:00 UTC
+            >>> end = 1704114000000     # Jan 1, 2024 13:00:00 UTC
+            >>> ohlc = await exchange.get_ohlc("BTCUSDT", "1h", start_time=start, end_time=end)
         """
-        return await self.client.get_ohlc(symbol, interval, limit)
+        return await self.client.get_ohlc(symbol, interval, limit, start_time, end_time)
 
     async def get_open_interest(self, symbol: str) -> OpenInterest:
         """

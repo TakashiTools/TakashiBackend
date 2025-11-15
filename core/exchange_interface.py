@@ -119,7 +119,9 @@ class ExchangeInterface(ABC):
         self,
         symbol: str,
         interval: str,
-        limit: int = 500
+        limit: int = 500,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
     ) -> List[OHLC]:
         """
         Fetch historical OHLC (candlestick) data from the exchange.
@@ -134,6 +136,10 @@ class ExchangeInterface(ABC):
             limit: Number of candlesticks to fetch (default: 500, max varies by exchange)
                    Most recent candles are returned (newest first or oldest first
                    depending on exchange, but should be normalized to newest first)
+            start_time: Optional start time in milliseconds since epoch (Unix timestamp * 1000)
+                       If not provided, fetches most recent candles
+            end_time: Optional end time in milliseconds since epoch (Unix timestamp * 1000)
+                     If not provided, uses current time
 
         Returns:
             List[OHLC]: List of OHLC objects sorted by timestamp (newest first)
@@ -149,12 +155,18 @@ class ExchangeInterface(ABC):
             >>> ohlc_data = await exchange.get_ohlc("BTCUSDT", "1h", limit=100)
             >>> print(f"Fetched {len(ohlc_data)} candles")
             >>> print(f"Latest close: {ohlc_data[0].close}")
+            
+            >>> # Fetch candles for a specific time range
+            >>> start = 1704110400000  # Jan 1, 2024 12:00:00 UTC in milliseconds
+            >>> end = 1704114000000    # Jan 1, 2024 13:00:00 UTC in milliseconds
+            >>> ohlc_data = await exchange.get_ohlc("BTCUSDT", "1h", start_time=start, end_time=end)
 
         Notes:
             - Data should be normalized to our OHLC schema
             - Timestamps must be UTC datetime objects
             - Handle exchange-specific quirks (ms vs seconds, field names, etc.)
             - Consider caching recent data to avoid rate limits
+            - If start_time and end_time are provided, limit may be ignored or used as max
         """
         ...
 

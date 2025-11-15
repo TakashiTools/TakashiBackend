@@ -267,7 +267,9 @@ def _to_hyperliquid_coin(symbol: str) -> str:
 async def get_multi_ohlc(
     symbol: str,
     interval: str,
-    limit: int = Query(default=200, ge=1, le=1000, description="Number of candles per exchange")
+    limit: int = Query(default=200, ge=1, le=1000, description="Number of candles per exchange"),
+    start_time: Optional[int] = Query(default=None, description="Start time in milliseconds since epoch (Unix timestamp * 1000)"),
+    end_time: Optional[int] = Query(default=None, description="End time in milliseconds since epoch (Unix timestamp * 1000)")
 ):
     """
     Get historical OHLC for the same market across all exchanges concurrently.
@@ -276,6 +278,7 @@ async def get_multi_ohlc(
         - Binance, Bybit expect pair symbols (e.g., BTCUSDT)
         - Hyperliquid expects coin symbols (e.g., BTC) - mapped automatically
         - Returns a dict: { exchangeName: List[OHLC] }
+        - start_time and end_time are optional; if provided, fetches candles within that time range
     """
     exchanges = ["binance", "bybit", "hyperliquid"]
     tasks = {}
@@ -291,7 +294,7 @@ async def get_multi_ohlc(
         if name == "hyperliquid":
             sym = _to_hyperliquid_coin(symbol)
 
-        tasks[name] = asyncio.create_task(ex.get_ohlc(sym, interval, limit))
+        tasks[name] = asyncio.create_task(ex.get_ohlc(sym, interval, limit, start_time, end_time))
 
     results = {}
     for name, task in tasks.items():
@@ -332,7 +335,9 @@ async def get_ohlc(
     exchange: str,
     symbol: str,
     interval: str,
-    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles")
+    limit: int = Query(default=500, ge=1, le=1500, description="Number of candles"),
+    start_time: Optional[int] = Query(default=None, description="Start time in milliseconds since epoch (Unix timestamp * 1000)"),
+    end_time: Optional[int] = Query(default=None, description="End time in milliseconds since epoch (Unix timestamp * 1000)")
 ):
     """
     Get historical OHLC/candlestick data.
@@ -340,6 +345,7 @@ async def get_ohlc(
     Examples:
         GET /binance/ohlc/BTCUSDT/1h?limit=100
         GET /hyperliquid/ohlc/BTC/1m?limit=50
+        GET /binance/ohlc/BTCUSDT/1h?start_time=1704110400000&end_time=1704114000000
     """
     try:
         ex = manager.get_exchange(exchange)
@@ -350,7 +356,7 @@ async def get_ohlc(
         raise HTTPException(status_code=404, detail=f"{exchange} does not support OHLC")
 
     try:
-        return await ex.get_ohlc(symbol, interval, limit)
+        return await ex.get_ohlc(symbol, interval, limit, start_time, end_time)
     except Exception as e:
         logger.error(f"OHLC error {exchange}/{symbol}/{interval}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch OHLC: {str(e)}")
@@ -550,7 +556,9 @@ async def get_binance_mark_prices():
 async def get_binance_klines_raw(
     symbol: str,
     interval: str,
-    limit: int = Query(500, ge=1, le=1500, description="Number of klines to return")
+    limit: int = Query(500, ge=1, le=1500, description="Number of klines to return"),
+    startTime: Optional[int] = Query(default=None, description="Start time in milliseconds since epoch (Unix timestamp * 1000)"),
+    endTime: Optional[int] = Query(default=None, description="End time in milliseconds since epoch (Unix timestamp * 1000)")
 ):
     """
     Proxy endpoint for Binance klines (raw format).
@@ -562,14 +570,21 @@ async def get_binance_klines_raw(
     
     Example:
         GET /binance/klines/BTCUSDT/5m?limit=12
+        GET /binance/klines/BTCUSDT/5m?startTime=1704110400000&endTime=1704114000000
     
     Returns: Array of kline arrays in Binance format [[openTime, open, high, low, close, volume, ...], ...]
     """
     try:
+        params = {"symbol": symbol.upper(), "interval": interval, "limit": limit}
+        if startTime is not None:
+            params["startTime"] = startTime
+        if endTime is not None:
+            params["endTime"] = endTime
+            
         async with httpx.AsyncClient() as client:
             response = await client.get(
                 f"{BINANCE_API_BASE}/klines",
-                params={"symbol": symbol.upper(), "interval": interval, "limit": limit},
+                params=params,
                 timeout=10.0
             )
             response.raise_for_status()

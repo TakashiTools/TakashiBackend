@@ -187,7 +187,9 @@ class BinanceAPIClient:
         self,
         symbol: str,
         interval: str,
-        limit: int = 500
+        limit: int = 500,
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None
     ) -> List[OHLC]:
         """
         Fetch historical OHLC (candlestick) data.
@@ -196,6 +198,8 @@ class BinanceAPIClient:
             symbol: Trading pair (e.g., "BTCUSDT")
             interval: Candlestick interval (e.g., "1m", "5m", "1h", "1d")
             limit: Number of candles to fetch (max 1500, default 500)
+            start_time: Optional start time in milliseconds since epoch
+            end_time: Optional end time in milliseconds since epoch
 
         Returns:
             List of OHLC objects sorted by timestamp (oldest first)
@@ -225,6 +229,11 @@ class BinanceAPIClient:
         Example:
             >>> ohlc = await client.get_ohlc("BTCUSDT", "1h", limit=100)
             >>> print(f"Latest close: ${ohlc[-1].close:,.2f}")
+            
+            >>> # Fetch candles for a specific time range
+            >>> start = 1704110400000  # Jan 1, 2024 12:00:00 UTC
+            >>> end = 1704114000000     # Jan 1, 2024 13:00:00 UTC
+            >>> ohlc = await client.get_ohlc("BTCUSDT", "1h", start_time=start, end_time=end)
         """
         params = {
             "symbol": symbol.upper(),
@@ -232,7 +241,19 @@ class BinanceAPIClient:
             "limit": min(limit, 1500)  # Binance max is 1500
         }
 
-        self.logger.info(f"Fetching OHLC: {symbol} {interval} (limit={limit})")
+        # Add optional time range parameters
+        if start_time is not None:
+            params["startTime"] = start_time
+        if end_time is not None:
+            params["endTime"] = end_time
+
+        log_msg = f"Fetching OHLC: {symbol} {interval} (limit={limit}"
+        if start_time:
+            log_msg += f", startTime={start_time}"
+        if end_time:
+            log_msg += f", endTime={end_time}"
+        log_msg += ")"
+        self.logger.info(log_msg)
 
         data = await self._get("/fapi/v1/klines", params)
 
