@@ -11,6 +11,10 @@
 
 ---
 
+> **Note:** This is a **reference implementation** showcasing the core architecture and API design. The production deployment includes additional infrastructure components, advanced caching layers, enhanced security features, and proprietary analytics engines not included in this open-source version.
+
+---
+
 ## Overview
 
 TAKASHI is a high-performance, production-ready backend service that aggregates cryptocurrency market data from leading exchanges (Binance, Bybit, Hyperliquid) behind a single, normalized API interface. Built with FastAPI and modern async Python, it provides both REST endpoints for historical data and WebSocket streams for real-time updates.
@@ -266,7 +270,11 @@ TakashiBackend/
 
 ## Deployment
 
-### **Railway (Recommended)**
+### **Development/Reference Deployment**
+
+This open-source version can be deployed using:
+
+#### **Railway (Recommended)**
 
 1. Connect GitHub repository to Railway
 2. Set environment variables in Railway dashboard
@@ -277,7 +285,7 @@ Railway will detect `Procfile` and run:
 uvicorn app.main:app --host 0.0.0.0 --port $PORT
 ```
 
-### **Docker**
+#### **Docker**
 
 ```bash
 # Build image
@@ -287,7 +295,7 @@ docker build -t takashi-backend .
 docker run -p 8000:8000 --env-file .env takashi-backend
 ```
 
-### **Manual Deployment**
+#### **Manual Deployment**
 
 ```bash
 # Install dependencies
@@ -300,6 +308,16 @@ export LOG_LEVEL=INFO
 # Run with gunicorn + uvicorn workers
 gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
 ```
+
+### **Production Deployment**
+
+The production implementation includes additional components not in this open-source version:
+- Redis cluster for distributed caching and rate limiting
+- Load balancing across multiple instances
+- Advanced monitoring and alerting infrastructure
+- Enhanced security layers and DDoS protection
+- Proprietary market analysis algorithms
+- Database persistence layer for historical data
 
 **Deployment Guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
