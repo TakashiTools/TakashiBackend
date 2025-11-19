@@ -11,34 +11,34 @@
 
 ---
 
-## 🌟 Overview
+## Overview
 
 TAKASHI is a high-performance, production-ready backend service that aggregates cryptocurrency market data from leading exchanges (Binance, Bybit, Hyperliquid) behind a single, normalized API interface. Built with FastAPI and modern async Python, it provides both REST endpoints for historical data and WebSocket streams for real-time updates.
 
 ### **Key Features**
 
-- 🔄 **Unified Interface** - One API, multiple exchanges (easy to add more)
-- ⚡ **High Performance** - Built on async Python with aiohttp and websockets
-- 📊 **Normalized Data** - Consistent schemas across all exchanges using Pydantic v2
-- 🔌 **Real-time Streaming** - WebSocket support for live market data
-- 🛡️ **Type-Safe** - Full type hints and runtime validation
-- 🔧 **Extensible** - Plugin architecture for adding new exchanges
-- 📈 **Advanced Analytics** - OI/Volume spike detection with statistical analysis
-- 🚀 **Production Ready** - Comprehensive error handling, logging, and testing
+- **Unified Interface** - One API, multiple exchanges (easy to add more)
+- **High Performance** - Built on async Python with aiohttp and websockets
+- **Normalized Data** - Consistent schemas across all exchanges using Pydantic v2
+- **Real-time Streaming** - WebSocket support for live market data
+- **Type-Safe** - Full type hints and runtime validation
+- **Extensible** - Plugin architecture for adding new exchanges
+- **Advanced Analytics** - OI/Volume spike detection with statistical analysis
+- **Production Ready** - Comprehensive error handling, logging, and testing
 
 ---
 
-## 📊 Supported Exchanges & Features
+## Supported Exchanges & Features
 
 | Exchange | OHLC | Open Interest | Funding Rate | Liquidations | Large Trades |
 |----------|------|---------------|--------------|--------------|--------------|
-| **Binance** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Bybit** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **Hyperliquid** | ✅ | ✅ | ✅ | ❌ | ✅ |
+| **Binance** | Yes | Yes | Yes | Yes | Yes |
+| **Bybit** | Yes | Yes | Yes | Yes | Yes |
+| **Hyperliquid** | Yes | Yes | Yes | No | Yes |
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### **Prerequisites**
 
@@ -99,7 +99,7 @@ LARGE_TRADE_THRESHOLD_USD=100000
 COINMARKETCAP_API_KEY=your_api_key_here
 ```
 
-> **📝 Note:** See `env.example` for all available configuration options.
+> **Note:** See `env.example` for all available configuration options.
 
 ### **Run the Server**
 
@@ -115,7 +115,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
 
 ---
 
-## 📚 API Documentation
+## API Documentation
 
 ### **REST Endpoints**
 
@@ -167,11 +167,11 @@ ws://{host}/ws/all/large_trades?min_value_usd=100000
 ws://{host}/ws/oi-vol?timeframes=5m,15m,1h
 ```
 
-**📖 Full API Reference:** [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
+**Full API Reference:** [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────────────┐
@@ -205,11 +205,11 @@ ws://{host}/ws/oi-vol?timeframes=5m,15m,1h
 - **Observer** - Event bus for pub/sub messaging
 - **Adapter** - Normalize exchange-specific data to common schemas
 
-**📖 Architecture Deep Dive:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+**Architecture Deep Dive:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Run all tests
@@ -232,7 +232,7 @@ pytest tests/integration/
 
 ---
 
-## 📦 Project Structure
+## Project Structure
 
 ```
 TakashiBackend/
@@ -264,7 +264,7 @@ TakashiBackend/
 
 ---
 
-## 🚢 Deployment
+## Deployment
 
 ### **Railway (Recommended)**
 
@@ -301,11 +301,11 @@ export LOG_LEVEL=INFO
 gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT
 ```
 
-**📖 Deployment Guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+**Deployment Guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
 
@@ -319,11 +319,11 @@ Adding a new exchange is straightforward:
 4. Create wrapper class implementing `ExchangeInterface`
 5. Register in `ExchangeManager`
 
-**📖 Developer Guide:** [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+**Developer Guide:** [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
 
 ---
 
-## 📋 Requirements
+## Requirements
 
 ### **Python Dependencies**
 
@@ -338,13 +338,13 @@ See [requirements.txt](requirements.txt) for full list.
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🔗 Links
+## Links
 
 - **Documentation:** [docs/](docs/)
 - **API Reference:** [docs/API_REFERENCE.md](docs/API_REFERENCE.md)
@@ -354,7 +354,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📧 Support
+## Support
 
 For questions, issues, or feature requests:
 
@@ -363,7 +363,7 @@ For questions, issues, or feature requests:
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 Built with:
 - [FastAPI](https://fastapi.tiangolo.com/) - Modern Python web framework
@@ -380,8 +380,8 @@ Exchange APIs:
 
 <div align="center">
 
-**⭐ Star this repository if you find it useful!**
+**Star this repository if you find it useful!**
 
-Made with ❤️ for the crypto trading community
+Made with love for the crypto trading community
 
 </div>

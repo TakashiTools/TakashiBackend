@@ -1,10 +1,10 @@
 # Contributing to TAKASHI
 
-Thank you for your interest in contributing to TAKASHI Multi-Exchange Market Data API! 🎉
+Thank you for your interest in contributing to TAKASHI Multi-Exchange Market Data API!
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Code of Conduct](#code-of-conduct)
 - [How Can I Contribute?](#how-can-i-contribute)
@@ -32,7 +32,7 @@ This project adheres to a code of conduct to foster an open and welcoming enviro
 
 ## How Can I Contribute?
 
-### 🐛 Reporting Bugs
+### Reporting Bugs
 
 Before creating bug reports, please check existing issues to avoid duplicates.
 
@@ -66,7 +66,7 @@ What you expected to happen.
 Any other relevant information.
 ```
 
-### 🚀 Suggesting Features
+### Suggesting Features
 
 We love feature suggestions! Before submitting:
 - Check if the feature already exists
@@ -88,7 +88,7 @@ How might this work? (if you have ideas)
 What other solutions have you considered?
 ```
 
-### 💻 Code Contributions
+### Code Contributions
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -472,5 +472,5 @@ Contributors will be recognized in:
 - Release notes
 - Project README
 
-Thank you for contributing! 🙏
+Thank you for contributing!
 
