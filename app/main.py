@@ -151,14 +151,12 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS (allow your frontend origins)
+# CORS Configuration (loaded from environment variables)
+# Set CORS_ORIGINS in .env to customize allowed origins
+# Example: CORS_ORIGINS=http://localhost:3000,https://yourdomain.com
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "https://takash-psi.vercel.app"
-    ],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]

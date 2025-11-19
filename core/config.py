@@ -159,6 +159,15 @@ class Settings(BaseSettings):
     )
 
     # ============================================
+    # CORS Configuration
+    # ============================================
+
+    cors_origins: str = Field(
+        default="http://localhost:3000,http://localhost:5173",
+        description="Comma-separated list of allowed CORS origins"
+    )
+
+    # ============================================
     # Caching Configuration
     # ============================================
 
@@ -226,6 +235,20 @@ class Settings(BaseSettings):
             ['1m', '5m', '15m', '1h', '4h', '1d']
         """
         return [i.strip().lower() for i in self.supported_intervals.split(",") if i.strip()]
+
+    @property
+    def cors_origins_list(self) -> List[str]:
+        """
+        Convert comma-separated CORS origins string to a list.
+
+        Returns:
+            List of allowed origin URLs (e.g., ["http://localhost:3000", "https://myapp.com"])
+
+        Example:
+            >>> settings.cors_origins_list
+            ['http://localhost:3000', 'http://localhost:5173']
+        """
+        return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
 
     @property
     def use_redis(self) -> bool:

@@ -1,11 +1,11 @@
-# 🧩 Guide: Adding a New Exchange Connector
+# Guide: Adding a New Exchange Connector
 
 This document explains **how to add a new exchange** (e.g., Bybit, OKX, Kraken) to the modular backend infrastructure.  
 The backend is built to make this process simple, consistent, and safe — following the same pattern used by Binance.
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 Every exchange lives in its own folder under `exchanges/`.  
 Each folder contains **two modules only**:
@@ -166,11 +166,11 @@ self.exchanges["bybit"] = {
 }
 ```
 
-✅ Once registered, your API and WS routes will automatically work for Bybit just like Binance.
+Once registered, your API and WS routes will automatically work for Bybit just like Binance.
 
 ---
 
-## 🧩 Example Field Mapping — Bybit → Normalized Schema
+## Example Field Mapping — Bybit → Normalized Schema
 
 | Normalized Field | Bybit Field | Notes |
 |------------------|-------------|-------|
@@ -183,11 +183,11 @@ self.exchanges["bybit"] = {
 | `is_closed` | `confirm` | bool |
 | `exchange` | `"bybit"` | constant |
 
-✅ This ensures consistent schema output across all connectors.
+This ensures consistent schema output across all connectors.
 
 ---
 
-## 🧪 Step 5: Add Integration Tests
+## Step 5: Add Integration Tests
 
 Create `tests/integration/test_bybit.py`
 
@@ -205,27 +205,27 @@ async def test_get_ohlc():
     assert candles[0].symbol == "BTCUSDT"
 ```
 
-✅ Confirms normalization works and API connectivity is healthy.
+Confirms normalization works and API connectivity is healthy.
 
 ---
 
-## ✅ Merge Checklist
+## Merge Checklist
 
 Before merging a new exchange connector:
 
 | Check | Status |
 |--------|--------|
-| Folder structure matches template | ✅ |
-| All data returned as normalized schemas | ✅ |
-| No blocking or sync code | ✅ |
-| Uses aiohttp (REST) and websockets (WS) | ✅ |
-| Configurable via `.env` | ✅ |
-| Integration tests pass | ✅ |
-| Logs appear under correct exchange name | ✅ |
+| Folder structure matches template | Yes |
+| All data returned as normalized schemas | Yes |
+| No blocking or sync code | Yes |
+| Uses aiohttp (REST) and websockets (WS) | Yes |
+| Configurable via `.env` | Yes |
+| Integration tests pass | Yes |
+| Logs appear under correct exchange name | Yes |
 
 ---
 
-## ⚡ Common Pitfalls
+## Common Pitfalls
 
 | Issue | Cause | Fix |
 |--------|--------|-----|
